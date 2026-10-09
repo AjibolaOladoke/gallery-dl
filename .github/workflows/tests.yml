@@ -1,0 +1,72 @@
+name: Tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+  push:
+    branches:
+    - master
+  pull_request:
+    branches:
+    - master
+
+jobs:
+  test:
+
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+        - "3.8"
+        - "3.9"
+        - "3.10"
+        - "3.11"
+        - "3.12"
+        - "3.13"
+        - "3.14"
+        - "pypy3.9"
+        - "pypy3.11"
+
+    steps:
+    - uses: gdl-org/clone@c54f55c32557e4755f08232bdb8a60f94a26fbdd  # v1.0.0
+
+    - name: Check file permissions
+      run: |
+        if [[ "$(find ./gallery_dl -type f -not -perm 644)" ]]; then exit 1; fi
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install flake8 youtube-dl
+
+    - name: Install yt-dlp
+      run: |
+        case "${{ matrix.python-version }}" in
+            3.8|3.9|pypy3.9)
+                # install from PyPI
+                pip install yt-dlp
+                ;;
+            *)
+                # install from master
+                pip install https://github.com/yt-dlp/yt-dlp/archive/refs/heads/master.tar.gz
+                ;;
+        esac
+
+    - name: Lint with flake8
+      run: |
+        flake8 .
+
+    - name: Run tests
+      run: |
+        make test
+
+    - name: Test autogeneration of man pages, bash/zsh/fish completion, etc
+      run: |
+        make
